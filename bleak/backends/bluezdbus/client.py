@@ -18,6 +18,7 @@ from dbus_next.message import Message
 from dbus_next.signature import Variant
 
 from bleak.backends.bluezdbus import defs
+from bleak.backends.bluezdbus.agent import PairingAgentBlueZDBus
 from bleak.backends.bluezdbus.characteristic import BleakGATTCharacteristicBlueZDBus
 from bleak.backends.bluezdbus.manager import get_global_bluez_manager
 from bleak.backends.bluezdbus.scanner import BleakScannerBlueZDBus
@@ -33,6 +34,8 @@ from .version import BlueZFeatures
 
 logger = logging.getLogger(__name__)
 
+# Instantiate pairing agent (single agent per app) but don't register it yet
+pairingAgent = PairingAgentBlueZDBus()
 
 class BleakClientBlueZDBus(BaseBleakClient):
     """A native Linux Bleak Client
@@ -48,6 +51,9 @@ class BleakClientBlueZDBus(BaseBleakClient):
             event loop when the client is disconnected. The callable must take one
             argument, which will be this client object.
         adapter (str): Bluetooth adapter to use for discovery.
+        handle_pairing (bool): If set to `True`, this application is responsible for handling the pairing events
+            (displaying, asking for, or confirming pins and passkeys) instead of the system/OS pairing wizard.
+            Defaults to `False`.
     """
 
     def __init__(self, address_or_ble_device: Union[BLEDevice, str], **kwargs):
@@ -77,6 +83,10 @@ class BleakClientBlueZDBus(BaseBleakClient):
         # used to override mtu_size property
         self._mtu_size: Optional[int] = None
 
+        # Optionally register pairing agent if this application shall handle pairing instead of OS agent
+        if kwargs.get("handle_pairing", False):
+            asyncio.ensure_future(pairingAgent.register())
+            
     # Connectivity methods
 
     async def connect(self, **kwargs) -> bool:
